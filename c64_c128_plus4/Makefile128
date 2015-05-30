@@ -1,0 +1,46 @@
+
+# unixy makefile.
+
+# This one comes with VICE
+C1541 = /opt/vice/bin/c1541
+
+CC = cl65
+AS = ca65
+AFLAGS=-t c128
+CFLAGS=-t c128 -O
+LFLAGS=-t c128 -O
+
+%.o: %.c
+	$(CC) -c $(CFLAGS) $< -o $@
+
+%.o: %.s
+	$(AS) $(AFLAGS) $< -o $@
+
+OBJS = main.o c128_ram.o
+
+all: r128 disk128
+
+c128_ram.o:
+	co65 --code-label _x_ram $(CC65_HOME)/emd/c128-ram.emd -o c128_ram.s
+	ca65 c128_ram.s
+
+r128: $(OBJS)
+	$(CC) $(LFLAGS) $^ -m $@.map -o $@
+
+rai128: r128
+	#pucrunch/pucrunch -m6 -c128 r128 rai128
+	#pucrunch/pucrunch -fshort -m6  -c128 r128 rai128
+	cp r128 rai128
+
+disk128: rai128
+	$(C1541) -format game,po  d64 $@.d64 > /dev/null
+	$(C1541) -attach $@.d64 -write rai128 > /dev/null || exit $$?;\
+	$(C1541) -attach $@.d64 -write ../games/dutch.rai > /dev/null || exit $$?;\
+	$(C1541) -attach $@.d64 -write ../games/mystery.rai > /dev/null || exit $$?;\
+	$(C1541) -attach $@.d64 -write ../games/adv1.rai > /dev/null || exit $$?;\
+	$(C1541) -attach $@.d64 -write ../games/al.rai > /dev/null || exit $$?;\
+	$(C1541) -attach $@.d64 -write ../games/pod.rai > /dev/null || exit $$?;\
+
+clean:
+	rm -rf *.o r128 rai128 r128.map disk128.d64 c128_ram.s
+

@@ -1,0 +1,40 @@
+
+# unixy makefile.
+
+# This one comes with VICE
+C1541 = /opt/vice/bin/c1541
+
+CC = cl65
+AS = ca65
+AFLAGS=-t plus4
+CFLAGS=-t plus4 -O
+LFLAGS=-t plus4 -O
+
+%.o: %.c
+	$(CC) -c $(CFLAGS) $< -o $@
+
+%.o: %.s
+	$(AS) $(AFLAGS) $< -o $@
+
+OBJS = main.o
+
+all: rp4 diskp4
+
+rp4: $(OBJS)
+	$(CC) $(LFLAGS) $^ -m $@.map -o $@
+
+raip4: rp4
+	pucrunch/pucrunch -fshort -m6 -f -c+4 rp4 raip4
+
+diskp4: raip4
+	$(C1541) -format game,po d64 $@.d64 > /dev/null
+	$(C1541) -attach $@.d64 -write raip4 > /dev/null || exit $$?;\
+	$(C1541) -attach $@.d64 -write ../games/dutch.rai > /dev/null || exit $$?;\
+	$(C1541) -attach $@.d64 -write ../games/mystery.rai > /dev/null || exit $$?;\
+	$(C1541) -attach $@.d64 -write ../games/adv1.rai > /dev/null || exit $$?;\
+	$(C1541) -attach $@.d64 -write ../games/al.rai > /dev/null || exit $$?;\
+	$(C1541) -attach $@.d64 -write ../games/pod.rai > /dev/null || exit $$?;\
+
+clean:
+	rm -rf *.o rp4 raip4 rp4.map diskp4.d64
+

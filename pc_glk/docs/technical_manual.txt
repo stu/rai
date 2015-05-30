@@ -1,0 +1,17 @@
+RAI Technical Manual
+
+
+SwitchPlayer
+- Causes an 'enter' event to be called on the room the active player is in.
+  Best thing to do is not to have any print statements in your enter event.
+
+  If you use light and darkness in your game, be sure your enter event correctly
+  sets the light flag for that room.
+
+Look
+- Does not override the darkness flag. If a light source is in the room, calls the room 'look' event,
+otherwise calls the 'in_dark' routine.
+
+Load
+- When a game is loaded (either from disk or ram), an internal 'look' command is issued, that does not
+cost a move.

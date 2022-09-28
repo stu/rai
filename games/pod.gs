@@ -98,7 +98,10 @@ on_gamewin
 	crlf
 	"Congratulations!"
 
-	"\n\nThe lift has taken me up to a plateau."
+	crlf
+	crlf
+
+	"The lift has taken me up to a plateau."
 	"You have managed to complete this adventure alive."
 
 	crlf
@@ -136,18 +139,28 @@ pregame
 	# set default light on
 	SetLightOn
 
-	"[WELCOME TO ADVENTURE A]\n\n"
+	"WELCOME TO ADVENTURE A"
+	crlf
+	crlf
 
-	"(C)1981 ARTIC COMPUTING\n"
+	"(C)1981 ARTIC COMPUTING"
+	crlf
 
-	"You can have an adventure in your own home. You command me with short sentences.\n\n"
+	"You can have an adventure in your own home. You command me with short sentences."
+	crlf
+	crlf
 
-	"Some useful words are;\n"
-	"inventory - tells you what you have\n"
-	"look - redescribe the location\n"
-	"quit - To restart the game\n"
-
-	"\nalso get, put, use and many more.\n"
+	"Some useful words are;"
+	crlf
+	"inventory - tells you what you have"
+	crlf
+	"look - redescribe the location"
+	crlf
+	"quit - To restart the game"
+	crlf
+	crlf
+	"also get, put, use and many more."
+	crlf
 
 	SetFlagFalse flTiedRopeDownPit
 	SetFlagFalse flRope
@@ -442,8 +455,9 @@ action look any
 		try
 		{
 			in rmIceCavern
-            "I can see a steep slope.\n"
-            exit true
+			"I can see a steep slope."
+			crlf
+			exit true
 		}
 
 		look
@@ -681,11 +695,8 @@ action use board
 	"You use the floor board to cross the ravine, once you make it to the other side IT BREAKS!"
 
 	swap itmBoard, itmBrokenBoard
-
 	goto rmBesideLake
-
 	drop itmBrokenBoard
-
 	exit true
 }
 
@@ -699,23 +710,6 @@ action use block
 	"You use the block of ice to slide down the slope!"
 
 	SetCounter cntIceMelts, 0
-
-	goto rmQuietCavern
-
-	drop itmIce
-	swap itmIce, itmPool
-
-	exit true
-}
-
-action use ice
-{
-	in rmIceCavern
-	has itmIce
-	"You use the block of ice to slide down the slope!"
-
-	SetCounter cntIceMelts, 0
-
 	goto rmQuietCavern
 
 	destroy itmIce
@@ -724,6 +718,24 @@ action use ice
 	crlf
 	"The ice melted! into a pool of water."
 
+	exit true
+}
+
+noun ice
+action use ice
+{
+	in rmIceCavern
+	has itmIce
+	"You use the block of ice to slide down the slope!"
+
+	SetCounter cntIceMelts, 0
+	goto rmQuietCavern
+
+	destroy itmIce
+	here itmPool
+
+	crlf
+	"The ice melted! into a pool of water."
 
 	exit true
 }
@@ -932,6 +944,7 @@ action bribe guard
 
 	destroy itmGoldCoin
 
+	crlf
 	"You hurry out past him while you can."
 
 	goto rmQuietCavern
@@ -949,6 +962,7 @@ action look lake
 	{
 		IsItemInRoom itmGoldCoin, void
 
+		crlf
 		"I see a gold coin down there."
 	}
 
@@ -974,7 +988,7 @@ action get coin
 				exit true
 			}
 
-			"You dont want to get your feet wet! That water is freezing."
+			"I dont want to get your feet wet! That water is freezing."
 			exit true
 		}
 
@@ -1313,11 +1327,11 @@ room rmDenseForest "Dense Forest"
 {
 	look
 	{
-		"I am in a dense forest."
+		"I am in a dense forest. "
 		try
 		{
 			IsFlagFalse flRope
-			"There is a rope tied up in one of the trees."
+			"There is a rope tied up in one of the trees. "
 		}
 
 		"There are exits to the south and west."

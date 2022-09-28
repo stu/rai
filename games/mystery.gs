@@ -5,7 +5,7 @@ release					"r1"
 ver						"%version%/%release%"
 
 # require interpreter version to be of v1 standard
-requires_interpreter	1
+requires_interpreter		1
 max_carry				6
 
 ##light_time 15
@@ -596,7 +596,7 @@ item itm_CrabDead [crab] "Dead Crab", "A dead giant crab" in void
 item itm_Crab [crab] "Giant Crab", "An angry looking giant crab" in rm_Shore
 item itm_CrabMeat [meat, crabmeat] "Crab Meat", "You see some juicy white crab meat" in void has take
 item itm_CrabShell [crab, shell] "Crab Shell", "You see nothing but crab shell pieces" in void has take
-item itm_RottenTree [tree] "Tree", "It is a  rotten tree" in rm_Shore
+item itm_RottenTree [tree] "Tree", "Its old and rotten.\nThere is writing on the trunk." in rm_Shore has scenery
 item itm_Ocean [ocean, sea] "Ocean", "The open ocean extends to the horizon" in rm_Peninsula has scenery
 item itm_Sand [sand] "Sand", "Plain old sand." in rm_Peninsula
 item itm_Boulder1 [boulder] "Boulder", "You see a very large boulder " in rm_Peninsula
@@ -652,6 +652,13 @@ verb sharpen
 # rm_Shore, crab + tree
 #
 
+action move tree
+{
+	IsItemHere itm_RottenTree
+	"The rotten tree comes down on top of me!"
+	LoseGame
+}
+
 action climb tree
 {
 	IsItemHere itm_RottenTree
@@ -659,14 +666,15 @@ action climb tree
 	LoseGame
 }
 
-action look tree
-{
-	IsItemHere itm_RottenTree
-	"Its old and rotten."
-	crlf
-	"There is writing on the trunk."
-	exit true
-}
+
+#action look tree
+#{
+#	IsItemHere itm_RottenTree
+#	"Its old and rotten."
+#	crlf
+#	"There is writing on the trunk."
+#	exit true
+#}
 
 noun writing
 action read writing
@@ -2576,46 +2584,7 @@ action break any
 	exit true
 }
 
-action break any
-{
-	try
-	{
-		nounis any
-		"Umm.. what?"
-		exit true
-	}
-
-	"You can't %verb% the %noun%?"
-	exit true
-}
-
-action break any
-{
-	try
-	{
-		nounis any
-		"Umm.. what?"
-		exit true
-	}
-
-	"You can't %verb% the %noun%?"
-	exit true
-}
-
 action throw any
-{
-	try
-	{
-		nounis any
-		"Umm.. what?"
-		exit true
-	}
-
-	"You can't %verb% the %noun%?"
-	exit true
-}
-
-action break any
 {
 	try
 	{
@@ -2634,33 +2603,7 @@ action panic any
 	exit true
 }
 
-action break any
-{
-	try
-	{
-		nounis any
-		"Umm.. what?"
-		exit true
-	}
-
-	"You can't %verb% the %noun%?"
-	exit true
-}
-
 action unlock any
-{
-	try
-	{
-		nounis any
-		"Umm.. what?"
-		exit true
-	}
-
-	"You can't %verb% the %noun%?"
-	exit true
-}
-
-action break any
 {
 	try
 	{
@@ -2686,33 +2629,7 @@ action pump any
 	exit true
 }
 
-action break any
-{
-	try
-	{
-		nounis any
-		"Umm.. what?"
-		exit true
-	}
-
-	"You can't %verb% the %noun%?"
-	exit true
-}
-
 action cut any
-{
-	try
-	{
-		nounis any
-		"Umm.. what?"
-		exit true
-	}
-
-	"You can't %verb% the %noun%?"
-	exit true
-}
-
-action break any
 {
 	try
 	{
@@ -2738,33 +2655,7 @@ action rub any
 	exit true
 }
 
-action break any
-{
-	try
-	{
-		nounis any
-		"Umm.. what?"
-		exit true
-	}
-
-	"You can't %verb% the %noun%?"
-	exit true
-}
-
 action spray any
-{
-	try
-	{
-		nounis any
-		"Umm.. what?"
-		exit true
-	}
-
-	"You can't %verb% the %noun%?"
-	exit true
-}
-
-action break any
 {
 	try
 	{
@@ -2790,33 +2681,7 @@ action fix any
 	exit true
 }
 
-action break any
-{
-	try
-	{
-		nounis any
-		"Umm.. what?"
-		exit true
-	}
-
-	"You can't %verb% the %noun%?"
-	exit true
-}
-
 action unlight any
-{
-	try
-	{
-		nounis any
-		"Umm.. what?"
-		exit true
-	}
-
-	"You can't %verb% the %noun%?"
-	exit true
-}
-
-action break any
 {
 	try
 	{
@@ -2842,33 +2707,7 @@ action feed any
 	exit true
 }
 
-action break any
-{
-	try
-	{
-		nounis any
-		"Umm.. what?"
-		exit true
-	}
-
-	"You can't %verb% the %noun%?"
-	exit true
-}
-
 action call any
-{
-	try
-	{
-		nounis any
-		"Umm.. what?"
-		exit true
-	}
-
-	"You can't %verb% the %noun%?"
-	exit true
-}
-
-action break any
 {
 	try
 	{
@@ -2894,19 +2733,6 @@ action kill any
 	exit true
 }
 
-action break any
-{
-	try
-	{
-		nounis any
-		"Umm.. what?"
-		exit true
-	}
-
-	"You can't %verb% the %noun%?"
-	exit true
-}
-
 action turn any
 {
 	try
@@ -2920,33 +2746,7 @@ action turn any
 	exit true
 }
 
-action break any
-{
-	try
-	{
-		nounis any
-		"Umm.. what?"
-		exit true
-	}
-
-	"You can't %verb% the %noun%?"
-	exit true
-}
-
 action whistle any
-{
-	try
-	{
-		nounis any
-		"Umm.. what?"
-		exit true
-	}
-
-	"You can't %verb% the %noun%?"
-	exit true
-}
-
-action break any
 {
 	try
 	{

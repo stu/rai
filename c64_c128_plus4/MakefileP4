@@ -2,7 +2,7 @@
 # unixy makefile.
 
 # This one comes with VICE
-C1541 = /opt/vice/bin/c1541
+C1541 = /usr/local/bin/c1541
 
 CC = cl65
 AS = ca65

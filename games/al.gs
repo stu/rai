@@ -3,10 +3,10 @@
 # Port Adventureland from TI99
 #
 
-requires_interpreter	2
+requires_interpreter		2
 max_carry				6
 author 					"Scott Adams"
-version 				"1"
+version 					"1"
 game 					"Adventureland"
 
 

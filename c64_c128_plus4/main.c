@@ -31,7 +31,6 @@
 #include "main.h"
 #include "game_structs.h"
 
-
 // consists of
 uint16_t save_data_length;
 uint8_t *save_data;
@@ -56,10 +55,10 @@ char line[MAX_LINE_LENGTH];
 uint8_t *words[MAX_WORDS];
 int words_idx[MAX_WORDS];
 
-uint8_t *save_name;
+char *save_name;
 
 // preallocated for string printing
-#define LOG_BUFFER_LEN 256
+#define LOG_BUFFER_LEN 128
 uint8_t strLogBuffer3[LOG_BUFFER_LEN];
 
 uGame *game_hdr;
@@ -75,11 +74,11 @@ void *ramsave_data;
 // c64 -> 50kb free 50 - 30 -> 20
 // +4 -> 55kb free 55 - 30 -> 25
 #if defined(__C64__)
-#define XBUFFER_SIZE	(15 * 1024)
+#define XBUFFER_SIZE	(10 * 1024) // 15
 #elif defined(__C128__)
-#define XBUFFER_SIZE	(2 * 1024)
+#define XBUFFER_SIZE	(2 * 1024)	// 2
 #elif defined(__PLUS4__)
-#define XBUFFER_SIZE	(20 * 1024)
+#define XBUFFER_SIZE	(20 * 1024)	// 20
 #else
 #error "Unknown machine type"
 #endif
@@ -328,9 +327,9 @@ static int get_bit(uint8_t *bits, int pos)
 	return (bits[pos / 8] & mask) == mask ? 1 : 0;
 }
 
-static void make_save_name(uint8_t *s)
+static void make_save_name(char *s)
 {
-	uint8_t *p;
+	char *p;
 
 	save_name = malloc(strlen(s) + 16);
 	strcpy(save_name, s);
@@ -472,22 +471,22 @@ static void internal_string_print(char *strX, ...)
 	va_list args;
 
 	va_start(args, strX);
-	vsprintf(strLogBuffer3, strX, args);
+	vsprintf((char*)strLogBuffer3, strX, args);
 	va_end(args);
 
-	c64_glk_put_string(strLogBuffer3, 0);
+	c64_glk_put_string((char*)strLogBuffer3, 0);
 }
 
 // internal shift print
-static void datafile_print_string(uint8_t *strX, ...)
+static void datafile_print_string(char *strX, ...)
 {
 	va_list args;
 
 	va_start(args, strX);
-	vsprintf(strLogBuffer3, strX, args);
+	vsprintf((char*)strLogBuffer3, strX, args);
 	va_end(args);
 
-	c64_glk_put_string(strLogBuffer3, 1);
+	c64_glk_put_string((char*)strLogBuffer3, 1);
 }
 
 static void new_paragraph(void)
@@ -514,8 +513,8 @@ void error(char *msg, ...)
 	va_list args;
 
 	va_start(args, msg);
-	vsprintf(strLogBuffer3, msg, args);
-	c64_glk_put_string(strLogBuffer3, 0);
+	vsprintf((char*)strLogBuffer3, msg, args);
+	c64_glk_put_string((char*)strLogBuffer3, 0);
 	va_end(args);
 
 	glk_exit();
@@ -702,8 +701,24 @@ static void load_game(char *game_file)
 	game_hdr->version[0xF] = 0;
 }
 
+
+static uint16_t get_stringXXX(uint16_t idx)
+{
+	uint8_t *ptr;
+#ifdef USE_EXTRA_RAM
+	uint16_t page;
+
+	page = game_hdr->offs_string_table + (2 * idx);
+	ptr = fill_buffer(page / EM_PAGE_SIZE) + (page % EM_PAGE_SIZE);
+#else
+	ptr = xdata + game_hdr->offs_string_table + (idx * 2);
+#endif
+	return get_pointer(ptr);
+}
+
 static uint8_t* get_string(uint16_t idx)
 {
+	/*
 	uint8_t *ptr;
 #ifdef USE_EXTRA_RAM
 	uint16_t page;
@@ -716,6 +731,14 @@ static uint8_t* get_string(uint16_t idx)
 #else
 	ptr = xdata + game_hdr->offs_string_table + (idx * 2);
 	return (xdata + get_pointer(ptr));
+#endif
+*/
+#ifdef USE_EXTRA_RAM
+	uint16_t page;
+	page = get_stringXXX(idx);
+	return fill_buffer(page / EM_PAGE_SIZE) + (page % EM_PAGE_SIZE);
+#else
+	return xdata + get_stringXXX(idx);
 #endif
 }
 
@@ -874,6 +897,10 @@ static uint8_t* get_stringX(int idx)
 	uint16_t lp2;
 	uint16_t lp3;
 #endif
+	uint16_t s1, s2, s3;
+
+	s2 = get_stringXXX(idx+1);
+	s1 = get_stringXXX(idx);
 
 	x = get_string(idx);
 	xx = x;
@@ -883,9 +910,13 @@ static uint8_t* get_stringX(int idx)
 	lp2 = last_page;
 #endif
 
-	while ((z = get_pointer(x)) != 0)
+	s3 = s2 - s1;
+	while (s3>0)
 	{
+		z = get_pointer(x);
 		x += 2;
+		s3 -= 2;
+
 		if (game_hdr->interp_required_version > 2)
 		{
 #ifdef USE_EXTRA_RAM
@@ -894,7 +925,7 @@ static uint8_t* get_stringX(int idx)
 #else
 			ptr = xdata + z;
 #endif
-			len += strlen(ptr);
+			len += strlen((char*)ptr);
 #ifdef USE_EXTRA_RAM
 			fill_buffer(lp3);
 #endif
@@ -906,6 +937,7 @@ static uint8_t* get_stringX(int idx)
 			{
 				z = get_pointer(x);
 				x += 2;
+				s3 -= 2;
 				len += (z >> 12);
 			}
 		}
@@ -924,20 +956,23 @@ static uint8_t* get_stringX(int idx)
 	xx = calloc(1, len + 16);
 	ptr = xx;
 
-	while ((z = get_pointer(x)) != 0)
+	s3 = s2 - s1;
+	while (s3>0)
 	{
 #ifdef USE_EXTRA_RAM
 		uint8_t *pbuff;
 
 		len = last_page;
 
+		z = get_pointer(x);
 		x += 2;
+		s3 -= 2;
 
 		if (game_hdr->interp_required_version > 2)
 		{
 			pbuff = fill_buffer(z / EM_PAGE_SIZE) + (z % EM_PAGE_SIZE);
-			memmove(ptr, pbuff, strlen(pbuff));
-			ptr += strlen(pbuff);
+			memmove(ptr, pbuff, strlen((char*)pbuff));
+			ptr += strlen((char*)pbuff);
 		}
 		else
 		{
@@ -950,6 +985,7 @@ static uint8_t* get_stringX(int idx)
 				fill_buffer(len);
 				z = get_pointer(x);
 				x += 2;
+				s3 -= 2;
 				pbuff = fill_buffer((z & 0xFFF) / EM_PAGE_SIZE) + ((z & 0xFFF) % EM_PAGE_SIZE);
 				memmove(ptr, pbuff, (z >> 12));
 				ptr += (z >> 12);
@@ -959,12 +995,14 @@ static uint8_t* get_stringX(int idx)
 		fill_buffer(len);
 		x = shift_up_buffer(x);
 #else
+		z = get_pointer(x);
 		x += 2;
+		s3 -= 2;
 
 		if (game_hdr->interp_required_version > 2)
 		{
-			memmove(ptr, xdata + z, strlen(xdata + z));
-			ptr += strlen(xdata + z);
+			memmove(ptr, xdata + z, strlen((char*)xdata + z));
+			ptr += strlen((char*)xdata + z);
 		}
 		else
 		{
@@ -975,6 +1013,7 @@ static uint8_t* get_stringX(int idx)
 			{
 				z = get_pointer(x);
 				x += 2;
+				s3 -= 2;
 				memmove(ptr, xdata + (z & 0xFFF), (z >> 12));
 				ptr += (z >> 12);
 			}
@@ -1002,7 +1041,7 @@ static uint8_t* get_stringX(int idx)
 
 static void print_string(uint16_t idx)
 {
-	uint8_t * ptr,*optr,*x;
+	uint8_t *ptr,*optr,*x;
 	uint8_t z;
 
 #ifdef USE_EXTRA_RAM
@@ -1032,11 +1071,11 @@ static void print_string(uint16_t idx)
 					break;
 
 				case 0x02:
-					c64_glk_put_string(words[0], 0);
+					c64_glk_put_string((char*)words[0], 0);
 					break;
 
 				case 0x03:
-					c64_glk_put_string(words[1], 0);
+					c64_glk_put_string((char*)words[1], 0);
 					break;
 
 				case 0x04:
@@ -1074,6 +1113,14 @@ static void print_string(uint16_t idx)
 	}
 
 	c64_glk_put_string((char *)x, 1);
+
+	ptr = x;
+	while(*ptr != 0)
+		ptr+=1;
+	if(ptr != x)
+		ptr -= 1;
+	if(*ptr == '.')
+		c64_glk_put_string(" ", 0);
 
 	free(optr);
 #ifdef USE_EXTRA_RAM
@@ -1177,7 +1224,7 @@ static char* get_player_name(uint8_t idx)
 #ifdef USE_EXTRA_RAM
 			fill_buffer(lp);
 #endif
-			return ptr;
+			return (char*)ptr;
 		}
 		else
 		{
@@ -1216,7 +1263,7 @@ static char* get_item_name(uint8_t idx)
 #ifdef USE_EXTRA_RAM
 			fill_buffer(lp);
 #endif
-			return ptr;
+			return (char*)ptr;
 		}
 		else
 		{
@@ -1249,7 +1296,7 @@ static uint8_t do_can_see(uint8_t room, uint8_t flags, uint8_t count)
 			{
 				q = (uint8_t *)get_item_name(i);
 
-				datafile_print_string(q);
+				datafile_print_string((char*)q);
 				free(q);
 
 				if (j < count - 1)
@@ -1577,12 +1624,12 @@ static void print_title_bar(char *msg)
 		q = get_stringX(tid);
 	}
 	else
-		q = msg;
+		q = (uint8_t*)msg;
 
-	x = strLogBuffer3;
+	x = (char*)strLogBuffer3;
 	memset(x, ' ', width);
 
-	len = strlen(q);
+	len = strlen((char*)q);
 	if (len >= width - 0)
 	{
 		len = width - 0;
@@ -1734,7 +1781,8 @@ static uint8_t run_codeblock(uint8_t *ptr)
 		"X_NOTIN",
 		"X_RANDOM",
 		"X_HASNOT",
-		"X_NOT"
+		"X_NOT",
+		"X_BYTECODE_JUMP"
 	};
 #endif
 
@@ -2118,6 +2166,12 @@ static uint8_t run_codeblock(uint8_t *ptr)
 				pause_time(ptr[0]);
 				ptr++;
 				break;
+			case X_BYTECODE_GOTO:
+				ptr += 1;
+				//ptr = get_pointer(ptr);
+				try_stack[try_idx] = get_pointer(ptr);
+				ptr = fill_buffer(try_stack[try_idx] / EM_PAGE_SIZE) + (try_stack[try_idx] % EM_PAGE_SIZE);
+				break;
 
 			default:
 				error("Unknown OPCODE %i", *ptr);
@@ -2339,7 +2393,7 @@ static uint8_t scan_word(uint16_t offs, uint8_t *word)
 		v = *ptr++;
 		do
 		{
-			if (xcmp_petscii_ascii((char *)word, (char *)ptr) == 0)
+			if (xcmp_petscii_ascii(word, ptr) == 0)
 			{
 #ifdef USE_EXTRA_RAM
 				fill_buffer(lp);
@@ -2347,7 +2401,7 @@ static uint8_t scan_word(uint16_t offs, uint8_t *word)
 				return (v);
 			}
 
-			ptr = strchr(ptr, 0);
+			ptr = (uint8_t*)strchr((char*)ptr, 0);
 			ptr++;
 
 		}while (*ptr != 0);
@@ -2544,7 +2598,7 @@ static void initial_clear_reset(void)
 	if (quit_restart_flag == 1)
 	{
 		glk_window_clear();
-		print_title_bar(game_hdr->game);
+		print_title_bar((char*)game_hdr->game);
 		gotoxy(0, 1);
 		reset_game();
 	}
@@ -2584,7 +2638,7 @@ void main(int argc, char *argv[])
 #endif
 
 	glk_window_clear();
-	print_title_bar(HEAD_TITLE);
+	print_title_bar((char*)HEAD_TITLE);
 	gotoxy(0, 1);
 
 	reset_rnd_seed();
@@ -2593,6 +2647,7 @@ void main(int argc, char *argv[])
 
 #ifdef USE_EXTRA_RAM
 	bootstrap_reu();
+	//internal_string_print("Internal page count %ukb\n", (256 * em_pagecount())/1024);
 #endif
 #ifdef HAVE_RAMLOAD_RAMSAVE
 	internal_string_print("\n#ramsave and #ramrestore supported\n");
@@ -2606,7 +2661,7 @@ void main(int argc, char *argv[])
 	else
 		load_game(DEFAULT_GAME_FILE);
 
-	print_title_bar(game_hdr->game);
+	print_title_bar((char*)game_hdr->game);
 
 	/* allocate save buffer */
 	save_data_length = 1; // current player
@@ -2641,25 +2696,21 @@ void main(int argc, char *argv[])
 		{
 			print_title_bar(NULL);
 			read_input();
-			if (words[0] == NULL)
-			{
-#ifdef USE_IT_HACK
-				words[0] = 1 + strchr(words[1], 0x0);
-				strcpy(words[0], "any");
-#else
-				words[0] = (uint8_t *)"any";
-#endif
-			}
 
-			if (words[1] == NULL)
+			for(quit_restart_flag = 0; quit_restart_flag < MAX_WORDS; quit_restart_flag++)
 			{
+				if (words[quit_restart_flag] == NULL)
+				{
 #ifdef USE_IT_HACK
-				words[1] = 1 + strchr(words[1], 0x0);
-				strcpy(words[1], "any");
+					//words[quit_restart_flag] = (uint8_t*)strchr((char*)words[quit_restart_flag], 0x0);
+					//strcpy((char*)words[quit_restart_flag], "any");
+					words[quit_restart_flag] = (uint8_t *)"any";
 #else
-				words[1] = (uint8_t *)"any";
+					words[quit_restart_flag] = (uint8_t *)"any";
 #endif
+				}
 			}
+			quit_restart_flag = 0;
 
 			new_paragraph();
 

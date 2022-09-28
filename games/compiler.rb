@@ -11,6 +11,7 @@ $input_file		= ""
 $verbose_flag		= 0
 $enable_action_any = 0
 $force_game_version = 0
+$create_getdrop_all = 0
 
 $template_any =
 <<eos
@@ -140,7 +141,7 @@ class Tokenise
 		ll.strip
 
 		while index < ll.length
-			if @breakers.include?(ll[index].chr) == TRUE
+			if @breakers.include?(ll[index].chr) == true
 				if index - start > 0
 					lx <<  ll.slice(start, index - start)
 				end
@@ -149,7 +150,7 @@ class Tokenise
 				start = index
 
 				# grabbers.
-			elsif @grabbers.include?(ll[index].chr) == TRUE
+			elsif @grabbers.include?(ll[index].chr) == true
 				# take what exists.
 				if index - start > 0
 					lx <<  ll.slice(start, index - start)
@@ -161,14 +162,14 @@ class Tokenise
 				index += 1
 				start = index
 
-			elsif @linecomments.include?(ll[index].chr) == TRUE
+			elsif @linecomments.include?(ll[index].chr) == true
 				#index = ll.length
 				ll[index] = "\n"
 				ll=ll.slice(0, index+1)
 				index = ll.length
 
 
-			elsif @quotes.include?(ll[index].chr) == TRUE
+			elsif @quotes.include?(ll[index].chr) == true
 				# skip over opening quote.
 				index += 1
 
@@ -180,7 +181,7 @@ class Tokenise
 							index += 2
 						end
 
-						if @quotes.include?(ll[index].chr) == TRUE
+						if @quotes.include?(ll[index].chr) == true
 							#index += 1
 							throw :breakout
 							line_endded = true
@@ -210,7 +211,7 @@ class Tokenise
 		while gcount > 0
 			gcount = 0
 			1..lx.length.times do |l|
-				if @glue.include?(lx[l-1].to_s + lx[l].to_s) == TRUE
+				if @glue.include?(lx[l-1].to_s + lx[l].to_s) == true
 					lx[l-1] = lx[l-1].to_s + lx[l].to_s
 					lx[l] = nil
 					gcount += 1
@@ -293,6 +294,8 @@ class Opcode
 	X_RANDOM = 40
 
 	X_NOT = 42
+
+	X_BYTECODE_GOTO = 43
 
 	X_ENDOPCODES = 255
 end
@@ -1500,6 +1503,19 @@ class CodeBlock
 		@id = name
 		@codes = Array.new
 	end
+
+	def print_code
+		i = 0
+		@bytes.each do |bb|
+			print  ("00" + bb.to_s(16))[-2..-1] + " "
+			i += 1
+			if i == 32
+				print "\n"
+				i = 0
+			end
+		end
+		print "\n"
+	end
 end
 
 def tok_assert(a, b, c)
@@ -2286,6 +2302,92 @@ def test_data(game)
 		#puts s
 	end
 
+	do_getall = false
+	do_dropall = false
+	if $create_getdrop_all == 1
+		do_getall = true
+		do_dropall = true
+	end
+
+	game.verbs.each do |vk, vv|
+		game.actions.each do |ka, kv|
+			if vv.id == "get" and kv.noun == "all"
+				do_getall = false
+				puts "skip get all because #{vv.id} #{kv.noun}"
+			end
+		end
+		game.actions.each do |ka, kv|
+			if vv.id == "get" and kv.noun == "all"
+				do_getall = false
+				puts "skip get all because #{vv.id} #{kv.noun}"
+			end
+		end
+	end
+
+	if do_getall == true or do_dropall == true
+		if game.nouns["all"] == nil
+			puts "Adding 'all' to nouns'"
+			game.nouns["all"] = Noun.new("all")
+		end
+	end
+
+	if do_getall == true
+		puts "Generating get all"
+		game.flags["__temp_getall_dropall"] = Flag.new("__temp_getall_dropall")
+		code = "action get all\n{\n"
+		code += "SetFlagFalse __temp_getall_dropall\n"
+		game.items.each do |keyitem,valueitem|
+			if valueitem.flags["take"] == true
+				code += "try\n{\n"
+				code += "CanCarry\n"
+				code += "IsItemHere #{valueitem.id}\n"
+				code += "Take #{valueitem.id}\n"
+				code += "\"You pick up the #{valueitem.noun}\\n\"\n"
+				code += "SetFlagTrue __temp_getall_dropall\n"
+				code += "}\n"
+				toks_get = parse_lines(get_code_lines(code))
+			end
+		end
+		code += "try\n"
+		code += "{\n"
+		code += "IsFlagTrue __temp_getall_dropall\n"
+		code += "exit true\n"
+		code += "}\n"
+		code += "}\n";
+		toks_any = parse_lines(get_code_lines(code))
+		action, index = parse_action(game, toks_any, 0)
+		game.actions["#{action.unique_id}.get.all"] = action
+	end
+
+	if do_dropall == true
+		puts "Generating drop all"
+		if do_getall == false
+			game.flags["__temp_getall_dropall"] = Flag.new("__temp_getall_dropall")
+		end
+		code = "action drop all\n{\n"
+		code += "SetFlagFalse __temp_getall_dropall\n"
+		game.items.each do |keyitem,valueitem|
+			if valueitem.flags["take"] == true
+				code += "try\n{\n"
+				code += "Has #{valueitem.id}\n"
+				code += "Drop #{valueitem.id}\n"
+				code += "\"You drop the #{valueitem.noun}\\n\"\n"
+				code += "SetFlagTrue __temp_getall_dropall\n"
+				code += "}\n"
+				toks_get = parse_lines(get_code_lines(code))
+			end
+		end
+		code += "try\n"
+		code += "{\n"
+		code += "IsFlagTrue __temp_getall_dropall\n"
+		code += "exit true\n"
+		code += "}\n"
+		code += "}\n";
+		toks_any = parse_lines(get_code_lines(code))
+		action, index = parse_action(game, toks_any, 0)
+		game.actions["#{action.unique_id}.drop.all"] = action
+	end
+
 	game.verbs.each do |vk, vv|
 		vflag = false
 
@@ -2297,8 +2399,6 @@ def test_data(game)
 
 		## 10 and below are directional verbs handled by the interpreter.
 		if vflag == false and vv.idx > 10
-
-
 			if $enable_action_any == 1
 				puts "No ANY action found for #{vv.id}. Generating it."
 				code = $template_any.to_s
@@ -2311,6 +2411,7 @@ def test_data(game)
 			end
 		end
 	end
+
 end
 
 def scan_verb(g, vvv)
@@ -2392,7 +2493,67 @@ def out_cstring(xx, fp)
 	fp.putc 0x0
 end
 
+class Cached_Block
+	attr_accessor :bytes, :offset
+
+	def initialize(off, arr)
+		@bytes = arr
+		@offset = off
+	end
+end
+
+# arr comes in as whole codeblock, so we know its on the front of an opcode
+def test_cache(c, arr)
+
+	max_block = nil
+	max_len = arr.length
+
+	if arr.length - 3 < 1
+		return nil, nil
+	end
+
+	c.each do |x|
+		if x.bytes.length >= arr.length
+			if x.bytes == arr
+				#puts "Comparing \n#{x.bytes}\n#{arr}"
+				return x.offset, 0
+			end
+
+			if x.bytes[(x.bytes.length - arr.length)..] == arr
+				#puts "#{x.bytes}\n#{x.bytes[(x.bytes.length - arr.length)..]}\n#{arr}"
+				return x.offset + (x.bytes.length - arr.length), 0
+			end
+
+
+			#offset = 0
+			#while offset < arr.length - 3
+			#	if x.bytes[((x.bytes.length - arr.length) + offset)..] == arr[offset..]
+			#		if offset < max_len
+			#			max_block = x
+			#			max_len = offset
+			#			#break
+			#		end
+			#		offset += 1
+			#	else
+			#		offset += 1
+			#	end
+			#end
+		end
+	end
+
+	#if max_block != nil
+		#puts "Sub Comparing\n#{max_block.bytes}\n#{arr}\n#{max_block.bytes[((max_block.bytes.length - arr.length) + max_len)..]}\n#{arr[max_len..]}"
+		#return max_block.offset + (max_block.bytes.length - max_len), max_len
+	#end
+
+	return nil, nil
+end
+
 def output_game(g)
+	cache = Array.new
+	saved = 0
+
+
 	filename = g.filename
 	filename = File.basename(filename, File.extname(filename)) + ".rai"
 
@@ -2444,7 +2605,6 @@ def output_game(g)
 
 	hh = Hash.new
 	g.strings.each do |k, v|
-
 		g.string_id.each do |kk, gg|
 			v = v.gsub("%#{kk}%", "#{gg}")
 		end
@@ -2462,6 +2622,9 @@ def output_game(g)
 		g.counters.each do |kk,gg|
 			v = v.gsub("%#{kk}%", ("\x1" << gg.idx))
 		end
+
+		v = v.gsub("%max_carry%", "#{g.max_carry}")
+
 		v = v.gsub("\\n", "\x4")
 		v = v.gsub("%verb%", "\x2")
 		v = v.gsub("%noun%", "\x3")
@@ -2480,6 +2643,7 @@ def output_game(g)
 			if z[vv][0] == '%' then
 				if z[vv].split('%').length > 1 then
 					puts "Error : Variable %#{z[vv][z[vv].split('%')[1]]}% undefined."
+					puts "#{v.str}"
 					exit
 				end
 			end
@@ -2673,6 +2837,8 @@ def output_game(g)
 
 	if end_offs >= max_dict_size then
 		puts "************ STRING TABLE TO BIG FOR OFFSET SIZE OF 0x#{max_dict_size.to_s(16).upcase}. Calculated at #{"0x" + ("0000" + end_offs.to_s(16).upcase).slice(-4,4)}"
+		fp.close
+		File.delete(filename)
 		exit
 	end
 
@@ -2697,6 +2863,8 @@ def output_game(g)
 
 	if fp.tell >= max_dict_size then
 		puts "************ STRING TABLE TO BIG FOR OFFSET SIZE OF 0x#{max_dict_size.to_s(16).upcase}"
+		fp.close
+		File.delete(filename)
 		exit
 	end
 
@@ -2796,10 +2964,8 @@ def output_game(g)
 				end
 			end
 		end
-		s.strx << 0
-
+		#s.strx << 0
 		l = s.strx.length
-
 		offs += l*2
 	end
 
@@ -2858,6 +3024,7 @@ def output_game(g)
 		r.codeblocks.each do |k,cb|
 			#puts "Compiling room code blocks #{r.id}.#{k}"
 			cb.compile(g)
+			#cb.print_code()
 
 			if k == "enter"
 				offs = offsx + 0
@@ -2885,6 +3052,8 @@ def output_game(g)
 				offs = offsx + 22
 			else
 				puts "***** Unknown room codeblock! Only enter or directions allowed. Not #{k}"
+				fp.close
+				File.delete(filename)
 				exit
 			end
 
@@ -2903,8 +3072,25 @@ def output_game(g)
 				zx = scan_verb(g, k)
 				fp.putc scan_verb(g,k)
 			end
-			cb.bytecode.each do |bb|
-				fp.putc bb.to_i & 0xFF
+
+			q_index, q_offset = test_cache(cache, cb.bytecode)
+			if q_index != nil
+
+				if q_offset > 0
+					for i in 1..q_offset
+						fp.putc cb.bytecode[i-1] & 0xFF
+					end
+				end
+
+				fp.putc Opcode::X_BYTECODE_GOTO
+				fp.putc q_index >> 8
+				fp.putc q_index & 0xFF
+				saved += (cb.bytecode.length - q_offset) - 3
+			else
+				cache << Cached_Block.new(fp.tell, cb.bytecode)
+				cb.bytecode.each do |bb|
+					fp.putc bb.to_i & 0xFF
+				end
 			end
 		end
 	end
@@ -2926,6 +3112,8 @@ def output_game(g)
 
 		if g.rooms[ i.location ] == nil
 			puts "***** Item #{i.id} points to non existant room #{i.location}"
+			fp.close
+			File.delete(filename)
 			exit
 		end
 
@@ -2951,6 +3139,8 @@ def output_game(g)
 
 		if g.nouns[i.noun] == nil
 			puts "***** Item #{i.id} has no noun"
+			fp.close
+			File.delete(filename)
 			exit
 		end
 		fp.putc g.nouns[ i.noun ].idx
@@ -2971,11 +3161,15 @@ def output_game(g)
 
 		if g.rooms[ i.location ] == nil
 			puts "***** Player Inventory #{i.id} points to non existant room #{i.location}"
+			fp.close
+			File.delete(filename)
 			exit
 		end
 
 		if g.rooms[ i.inventory ] == nil
 			puts "***** Player Inventory #{i.id} points to non existant room #{i.inventory}"
+			fp.close
+			File.delete(filename)
 			exit
 		end
 
@@ -3086,6 +3280,8 @@ def output_game(g)
 			gc_offsx = gc_offs + 14
 		else
 			puts "***** Unknown key for global codeblock #{k}"
+			fp.close
+			File.delete(filename)
 			exit
 		end
 
@@ -3114,63 +3310,134 @@ def output_game(g)
 		puts "Generated #{g.actions.length} actions"
 	end
 
+	glist = Array.new
 	g.actions.each do |k,cb|
-		if cb.noun != "any" then
-			if $verbose_flag > 0
-				puts "Compiling action #{k}"
-			end
-			cb.codeblock.compile(g)
+		cb.codeblock.compile(g)
+		glist << cb.codeblock.bytecode.length
+	end
 
-			if g.verbs[cb.verb] == nil then
-				puts "***** Missing verb '#{cb.verb}'"
-				exit
-			end
+	glist = glist.sort_by { |x| -x }
+	glist = glist.uniq
 
-			if g.nouns[cb.noun] == nil then
-				puts "***** Missing item/noun '#{cb.noun}'"
-				exit
-			end
+	glist.each do |glist_size|
+		g.actions.each do |k,cb|
+			if cb.codeblock.bytecode.length == glist_size
+				if cb.noun != "any" then
+					if $verbose_flag > 0
+						puts "Compiling action #{k}"
+					end
+					#cb.codeblock.compile(g)
+					#cb.codeblock.print_code()
 
-			fp.putc g.verbs[cb.verb].idx
-			fp.putc g.nouns[cb.noun].idx
+					if g.verbs[cb.verb] == nil then
+						puts "***** Missing verb '#{cb.verb}'"
+						fp.close
+						File.delete(filename)
+						exit
+					end
 
-			fp.putc cb.codeblock.bytecode.length >> 8
-			fp.putc cb.codeblock.bytecode.length & 0xFF
+					if g.nouns[cb.noun] == nil then
+						puts "***** Missing item/noun '#{cb.noun}'"
+						fp.close
+						File.delete(filename)
+						exit
+					end
 
-			cb.codeblock.bytecode.each do |bb|
-				fp.putc bb.to_i & 0xFF
+					fp.putc g.verbs[cb.verb].idx
+					fp.putc g.nouns[cb.noun].idx
+
+					q_index, q_offset = test_cache(cache, cb.codeblock.bytecode)
+					if q_index != nil
+						if q_offset > 0
+							qqq = q_offset + 3
+							fp.putc qqq >> 8
+							fp.putc qqq & 0xFF
+
+							for i in 1..q_offset
+								fp.putc cb.codeblock.bytecode[i-1] & 0xFF
+							end
+						else
+							qqq = 3
+							fp.putc qqq >> 8
+							fp.putc qqq & 0xFF
+						end
+
+						fp.putc Opcode::X_BYTECODE_GOTO
+						fp.putc q_index >> 8
+						fp.putc q_index & 0xFF
+						saved += (cb.codeblock.bytecode.length - q_offset) - 3
+					else
+						fp.putc cb.codeblock.bytecode.length >> 8
+						fp.putc cb.codeblock.bytecode.length & 0xFF
+
+						cache << Cached_Block.new(fp.tell, cb.codeblock.bytecode)
+						cb.codeblock.bytecode.each do |bb|
+							fp.putc bb.to_i & 0xFF
+						end
+					end
+				end
 			end
 		end
 	end
 
-	g.actions.each do |k,cb|
-		if cb.noun == "any" then
-			if $verbose_flag > 0
-				puts "Compiling action #{k}"
-			end
-			cb.codeblock.compile(g)
+	glist.each do |glist_size|
+		g.actions.each do |k,cb|
+			if (cb.codeblock.bytecode.length == glist_size)
+				if cb.noun == "any" then
+					if $verbose_flag > 0
+						puts "Compiling action #{k}"
+					end
+					#cb.codeblock.compile(g)
+					#cb.codeblock.print_code()
 
-			if g.verbs[cb.verb] == nil then
-				puts "***** Missing verb '#{cb.verb}'"
-				exit
-			end
+					if g.verbs[cb.verb] == nil then
+						puts "***** Missing verb '#{cb.verb}'"
+						fp.close
+						File.delete(filename)
+						exit
+					end
 
-			if g.nouns[cb.noun] == nil then
-				puts "***** Missing item/noun '#{cb.noun}'"
-				exit
-			end
+					if g.nouns[cb.noun] == nil then
+						puts "***** Missing item/noun '#{cb.noun}'"
+						fp.close
+						File.delete(filename)
+						exit
+					end
 
-			fp.putc g.verbs[cb.verb].idx
-			fp.putc g.nouns[cb.noun].idx
+					fp.putc g.verbs[cb.verb].idx
+					fp.putc g.nouns[cb.noun].idx
 
-			fp.putc cb.codeblock.bytecode.length >> 8
-			fp.putc cb.codeblock.bytecode.length & 0xFF
+					q_index, q_offset = test_cache(cache, cb.codeblock.bytecode)
+					if q_index != nil
+						qqq = q_offset + 3#(cb.codeblock.bytecode.length - q_offset) + 3
+						fp.putc qqq >> 8
+						fp.putc qqq & 0xFF
 
-			cb.codeblock.bytecode.each do |bb|
-				fp.putc bb.to_i & 0xFF
+						if q_offset > 0
+							for i in 1..q_offset
+								fp.putc cb.codeblock.bytecode[i-1] & 0xFF
+							end
+						end
+
+						fp.putc Opcode::X_BYTECODE_GOTO
+						fp.putc q_index >> 8
+						fp.putc q_index & 0xFF
+						saved += (cb.codeblock.bytecode.length - q_offset) - 3
+					else
+						fp.putc cb.codeblock.bytecode.length >> 8
+						fp.putc cb.codeblock.bytecode.length & 0xFF
+
+						cache << Cached_Block.new(fp.tell, cb.codeblock.bytecode)
+
+						cb.codeblock.bytecode.each do |bb|
+							fp.putc bb.to_i & 0xFF
+						end
+					end
+				end
 			end
 		end
 	end
+
 	fp.putc 0x0
 
 	fp.seek 0x18, IO::SEEK_SET
@@ -3182,16 +3449,18 @@ def output_game(g)
 
 	fp.seek 0, IO::SEEK_END
 
-	total_length = fp.tell
+	xtotal_length = fp.tell
 
-	total_length = 1 + (total_length / 1024);
+
+	total_length = 1 + (xtotal_length / 1024);
 
 	fp.seek 0x1C, IO::SEEK_SET
 	fp.putc total_length >> 8
 	fp.putc total_length & 0xFF
 
+	puts "Cache blocking saved #{saved} bytes"
 	if $verbose_flag > 0
-		puts "Game file requires #{total_length} kb (0x#{total_length.to_s(16).upcase})"
+		puts "Game file requires (#{xtotal_length} vs #{xtotal_length+saved}) #{total_length} kb (0x#{total_length.to_s(16).upcase})"
 	end
 
 	fp.close
@@ -3304,6 +3573,9 @@ def parse_game_file(filename, token_stream)
 
 		elsif token_stream[index].downcase == "counter"
 			if nil == g.counters[token_stream[index + 1].downcase]
+				if $verbose_flag > 0
+					puts "Adding counter #{token_stream[index + 1].to_s.downcase}"
+				end
 				g.counters[token_stream[index + 1].to_s.downcase ] = Counter.new(token_stream[index + 1].to_s.downcase)
 			else
 				puts "Counter \"" + token_stream[index + 1] + "\" already exists"
@@ -3454,7 +3726,6 @@ def main(filename)
 	lfiles = filename
 
 	if $verbose_flag > 0
-		puts "Retro Adventure game compiler"
 		puts "Running Compiler on #{lfiles}"
 		if $force_game_version > 0
 			puts "Forcing game version #{$force_game_version}"
@@ -3469,6 +3740,7 @@ end
 
 
 if __FILE__ == $0
+	puts "Retro Adventure game compiler"
 
 	i = 0;
 	while i < ARGV.length
@@ -3479,6 +3751,8 @@ if __FILE__ == $0
 			$verbose_flag = 1
 		elsif x == "-x"
 			$enable_action_any = 1
+		elsif x == "-z"
+			$create_getdrop_all = 1
 		elsif x == "-f"
 			i += 1
 			x = ARGV[i].to_s
@@ -3486,6 +3760,7 @@ if __FILE__ == $0
 		elsif x == "-?" or x == "-h"
 			puts "syntax; compiler.rg [-v] inputfile"
 			puts "-x  Enable generation of action ANY commands when missing"
+			puts "-z  Create a get all / drop all action"
 			puts "-f# Force game file version (1, 2, 3)"
 			puts "-v  Verbose"
 			exit
@@ -3497,7 +3772,7 @@ if __FILE__ == $0
 	end
 
 	if $input_file.length > 0
-		if File.exists?($input_file)
+		if File.exist?($input_file)
 			main($input_file)
 
 			if $verbose_flag > 0

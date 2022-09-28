@@ -168,7 +168,11 @@ prompt
 			addcounter cntscore, 10
 		}
 
-		WinGame
+		try
+		{
+			countereq cntscore, 30
+			WinGame
+		}
 	}
 
 	"> "

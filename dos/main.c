@@ -7,7 +7,7 @@
 #include <stdint.h>
 #include <time.h>
 
-#include <glk.h>
+#include "pc.h"
 
 #define RAI_MAJOR	3
 #define RAI_VERSION	"3.0"
@@ -17,24 +17,11 @@
 
 //#define DEBUG_OPCODES
 
-#ifdef BUILD_UNIXLIKE
-#include "glkstart.h"
-#include "unix_glkterm.h"
-#ifdef GARGLK
-#include <garversion.h>
-#endif
-#endif
-
-#ifdef BUILD_WIN32
-#include <winglk.h>
-#include "win32_glk.h"
-#endif
-
 
 extern char *retro_filename;
 
 #include "main.h"
-#include "game_structs.h"
+#include "structs.h"
 
 #ifdef BUILD_UNIXLIKE
 #define stricmp strcasecmp
@@ -44,9 +31,6 @@ extern char *retro_filename;
 #define USE_IT_HACK
 
 uint8_t *save_name;
-
-winid_t mainwin;
-winid_t scorewin;
 
 uint32_t game_length;
 uGame *game_hdr;
@@ -88,7 +72,7 @@ char strLogBuffer3[1024];
 #define CODE_QUIT_RESTART		5
 
 static int run_codeblock(uint8_t *ptr);
-static uint16_t get_counter(int idx);
+uint16_t get_counter(int idx);
 
 
 
@@ -157,38 +141,6 @@ static uint16_t get_pointer(uint8_t *ptr)
 }
 
 
-static void printstring(char *s)
-{
-	char *p;
-
-	p = s;
-
-	while (*p != 0x0)
-	{
-		switch (*p)
-		{
-			case 0x0A:
-			case 0x0D:
-				glk_put_string("\n");
-				last_char_out += 1;
-				p++;
-				break;
-
-			case '\t':
-				glk_put_string("    ");
-				last_char_out = 0;
-				p++;
-				break;
-
-			default:
-				last_char_out = 0;
-				glk_put_char(*p);
-				p++;
-				break;
-		}
-	}
-}
-
 void gprintf(char *strX, ...)
 {
 	va_list args;
@@ -196,7 +148,7 @@ void gprintf(char *strX, ...)
 	va_start(args, strX);
 	vsprintf(strLogBuffer3, strX, args);
 
-	printstring(strLogBuffer3);
+	glk_put_string(strLogBuffer3);
 
 	va_end(args);
 }
@@ -224,74 +176,12 @@ void error(char *msg, ...)
 
 	va_start(args, msg);
 	vsprintf(strLogBuffer, msg, args);
-	printstring(strLogBuffer);
+	glk_put_string(strLogBuffer);
 	va_end(args);
 
 	glk_exit();
 }
 
-
-glui32 get_keypress(void)
-{
-	event_t ev;
-	glui32 key;
-
-	/* cancel all input events pending. */
-	glk_cancel_char_event(mainwin);
-	glk_cancel_line_event(mainwin, &ev);
-
-	glk_request_char_event(mainwin);
-	do
-	{
-		glk_select(&ev);
-
-		if (ev.type == evtype_CharInput)
-			key = ev.val1;
-
-	}while (ev.type != evtype_CharInput);
-
-	return key;
-}
-
-void print_title_bar(char *s)
-{
-	glui32 width, height;          /* Status window dimensions */
-	strid_t status_stream;          /* Status window stream */
-	char *x;
-	int len;
-	char score[32];
-
-	/* Measure the status window, and do nothing if height is zero. */
-	glk_window_get_size(scorewin, &width, &height);
-
-	x = calloc(1, width + 32);
-	memset(x, ' ', width);
-
-	len = strlen(s);
-	if (len >= width - 0)
-	{
-		len = width - 0;
-	}
-	memmove(x + 1, s, len);
-
-	if (save_data != NULL)
-	{
-		// SCORE is always var 1!
-		sprintf(score, "Score: %i", get_counter(1));
-		memmove(x + width - (strlen(score) + 1), score, strlen(score));
-	}
-
-	glk_set_window(scorewin);
-	//glk_window_move_cursor(scorewin, 0, 0);
-	glk_set_style(style_User1);
-	glk_window_clear(scorewin);
-	glk_put_buffer(x, width);
-
-	//glk_window_move_cursor(scorewin, 0, 0);
-	glk_set_window(mainwin);
-
-	free(x);
-}
 
 static void discombobulate_header(uGame *g)
 {
@@ -306,22 +196,21 @@ static void discombobulate_header(uGame *g)
 	g->size_in_kb = get_pointer((void *)&g->size_in_kb);
 }
 
-static void load_game(strid_t realfd)
+static void load_game(FILE *fp)
 {
-	glk_stream_set_position(realfd, 0x0, seekmode_Start);
-	glk_stream_set_position(realfd, 0x0, seekmode_End);
-	game_length = glk_stream_get_position(realfd);
+	fseek(fp, 0x0L, SEEK_END);
+	game_length = ftell(fp);
 
 	if (game_length == 0)
 		error("Game file size is incorrect\n");
 
-	glk_stream_set_position(realfd, 0x0, seekmode_Start);
+	fseek(fp, 0x0L, SEEK_SET);
 
 	data = calloc(1, game_length + 16);
 	if (data == NULL)
 		error("Not enough memory for game file (%ikb)", (game_length / 1024) + 1);
 
-	if (glk_get_buffer_stream(realfd, (void *)data, game_length) != game_length)
+	if (fread(data, 1, game_length, fp) != game_length)
 		error("bad data file");
 
 	game_hdr = (void *)data;
@@ -356,7 +245,6 @@ static void load_game(strid_t realfd)
 	game_hdr->version[0xF] = 0;
 }
 
-
 static char* get_string(int idx)
 {
 	uint8_t *ptr;
@@ -368,12 +256,12 @@ static char* get_string(int idx)
 }
 
 
-static inline void set_current_player(int p)
+static void set_current_player(int p)
 {
 	save_data[0] = p;
 }
 
-static inline uint8_t get_current_player(void)
+static uint8_t get_current_player(void)
 {
 	return save_data[0];
 }
@@ -503,7 +391,7 @@ static void set_counter(int idx, int num)
 	x[idx] = num;
 }
 
-static uint16_t get_counter(int idx)
+uint16_t get_counter(int idx)
 {
 	uint16_t *x;
 
@@ -513,18 +401,16 @@ static uint16_t get_counter(int idx)
 
 static uint8_t* get_stringX(int idx)
 {
-	uint8_t *ptr, *x, *xx;
+	uint8_t * ptr,*x,*xx;
 	int offs;
 	int len;
 	uint16_t z;
-
 	uint16_t s1, s2, s3;
 
 	s1 = get_pointer(data + game_hdr->offs_string_table + (idx * 2) + 0);
 	s2 = get_pointer(data + game_hdr->offs_string_table + (idx * 2) + 2);
 
 	x = get_string(idx);
-
 	ptr = x;
 	len = 0;
 
@@ -582,8 +468,9 @@ static uint8_t* get_stringX(int idx)
 		if (len == 15 && game_hdr->interp_required_version < 3)
 		{
 			z = get_pointer(x);
-			s3 -= 2;
 			x += 2;
+			s3 -= 2;
+
 			offs = z & 0xFFF;
 			len = z >> 12;
 			memmove(ptr, data + offs, len);
@@ -695,7 +582,6 @@ static void print_string(int idx)
 	}
 
 	gprintf(x);
-
 	xx = strchr(x, 0);
 	if(xx != x)
 		xx -= 1;
@@ -708,7 +594,7 @@ static void print_string(int idx)
 }
 
 
-static int call_global_codeblock(int id)
+static void call_global_codeblock(int id)
 {
 	uint8_t *ptr;
 
@@ -941,7 +827,7 @@ static void show_inventory(void)
 }
 
 
-static int call_room_codeblock(int id)
+static void call_room_codeblock(int id)
 {
 	uint8_t *ptr;
 	int offs;
@@ -1138,7 +1024,7 @@ static int run_codeblock(uint8_t *ptr)
 		"X_RANDOM",
 		"X_HASNOT",
 		"X_NOT",
-		"X_BYTECODE_GOTO",
+		"X_BYTECODE_JUMP",
 	};
 #endif
 
@@ -1215,7 +1101,6 @@ static int run_codeblock(uint8_t *ptr)
 
 			case X_COUNTERLT:
 				ptr++;
-				gprintf("counter %u(%u) < %u\n", ptr[0], get_counter(ptr[0]), get_pointer(1 + ptr));
 				if (!(get_counter(ptr[0]) < (get_pointer(1 + ptr))))
 				{
 					qflag = 1;
@@ -1500,7 +1385,6 @@ static int run_codeblock(uint8_t *ptr)
 
 				ptr += 2;
 				break;
-
 			case X_BYTECODE_GOTO:
 				ptr += 1;
 				ptr = data + get_pointer(ptr);
@@ -1549,8 +1433,7 @@ static void reset_game(void)
 
 static void read_input(void)
 {
-	event_t event;
-	glui32 key;
+	uint16_t key;
 	uint8_t *p;
 	int i;
 
@@ -1560,23 +1443,8 @@ static void read_input(void)
 		words_idx[i] = -1;
 	}
 
-
-	glk_cancel_char_event(mainwin);
-	glk_cancel_line_event(mainwin, &event);
-
-	do
-	{
-		memset(line, 0, MAX_LINE_LENGTH);
-		glk_request_line_event(mainwin, line, MAX_LINE_LENGTH - 2, 0);
-		glk_select(&event);
-
-		switch (event.type)
-		{
-			case evtype_LineInput:
-				line[event.val1] = 0;   /* Null terminate it */
-				break;
-		};
-	} while (event.type != evtype_LineInput);
+	clear_input_buffer();
+	read_input_buffer(line, MAX_LINE_LENGTH);
 
 	p = line;
 	i = 0;
@@ -1771,8 +1639,7 @@ static void initial_clear_reset(void)
 {
 	if (quit_restart_flag == 1)
 	{
-		glk_set_window(mainwin);
-		glk_window_clear(mainwin);
+		glk_window_clear();
 		print_title_bar(game_hdr->game);
 		reset_game();
 	}
@@ -1781,36 +1648,18 @@ static void initial_clear_reset(void)
 
 void glk_main(void)
 {
-	strid_t sid = 0;
-	frefid_t fid = 0;
-	glui32 res;
+	FILE *fp;
+	uint16_t res;
+
 #ifdef USE_IT_HACK
 	char *old_word2 = NULL;
 #endif
 	reset_rnd_seed();
 
-	glk_stylehint_set(wintype_TextGrid, style_User1, stylehint_ReverseColor, 1);
-
-	mainwin = glk_window_open(0, 0, 0, wintype_TextBuffer, 0);
-	assert(mainwin != NULL);
-	scorewin = glk_window_open(mainwin, winmethod_Above | winmethod_Fixed, 1, wintype_TextGrid, 0);
-
-	glk_set_window(mainwin);
-	glk_window_clear(mainwin);
+	glk_window_clear();
 	glk_set_style(style_Header);
-
-#ifdef WINGLK_H_
-	winglk_app_set_name("Retro Adventure Interpreter");
-	winglk_window_set_title("RAI v" RAI_VERSION " - " RAI_COPYRIGHT "");
-#endif
-
-#ifdef GARGLK
-	garglk_set_program_name("Retro Adventure Interpreter");
-	garglk_set_program_info("RAI v" RAI_VERSION " - " RAI_COPYRIGHT "\n"
-							"Gargoyle tweaks by Tor Andersson");
-#endif
-
-	gprintf("RAI v" RAI_VERSION " - Copyright (c) 2011 by Stu George\n");
+	glk_put_string("Retro Adventure Interpreter\n");
+	glk_put_string("RAI v" RAI_VERSION " - " RAI_COPYRIGHT "\n");
 	glk_set_style(style_Normal);
 
 	if (retro_filename == NULL)
@@ -1820,14 +1669,6 @@ void glk_main(void)
 
 	make_save_name(retro_filename);
 
-
-	res = glk_gestalt(gestalt_Version, 0);
-#ifndef GARGLK
-	gprintf("Running on Glk v%i.%i.%i\n", (res >> 16), (res >> 8) & 0xFF, res & 0xFF);
-#else
-	gprintf("GarGlk version " VERSION "; Glk v%i.%i.%i\n", (res >> 16), (res >> 8) & 0xFF, res & 0xFF);
-#endif
-
 #ifdef HAVE_RAMLOAD_RAMSAVE
 	gprintf("\n#ramsave and #ramload supported\n");
 #endif
@@ -1835,39 +1676,15 @@ void glk_main(void)
 	gprintf("'IT' hack supported (last verb used inplace of 'it')\n");
 #endif
 
-#if defined(WINGLK_H_)
-	fid = winglk_fileref_create_by_name(fileusage_BinaryMode, retro_filename, 0, 0);
-	if (fid == 0)
-		error("Error creating fileref");
-
-	sid = glk_stream_open_file(fid, filemode_Read, 0);
-#elif defined(GARGLK) //|| defined(GT_START_H)
-// #ifdef GARGLK
-	// fid = garglk_fileref_create_by_name(fileusage_BinaryMode, retro_filename, 0);
-	// sid = glk_stream_open_file(fid, filemode_Read, 0);
-// #endif
-	sid = glkunix_stream_open_pathname(retro_filename, 0, 0);
-#else
-	fid = glk_fileref_create_by_name(fileusage_BinaryMode, retro_filename, 0);
-	if (fid == 0)
-		error("Error creating fileref");
-
-	sid = glk_stream_open_file(fid, filemode_Read, 0);
-#endif
-
-	if (sid == 0)
-		error("Error opening stream [%s]", retro_filename);
-
-	load_game(sid);
-	glk_stream_close(sid, NULL);
+	fp = fopen(retro_filename, "rb");
+	if (fp == NULL)
+		error("Error opening file");
+	load_game(fp);
+	fclose(fp);
 
 	print_title_bar(game_hdr->game);
 
-	if (fid != 0)
-		glk_fileref_destroy(fid);
-
 	gprintf("\n%s by %s\nVersion %s\n\n", game_hdr->game, game_hdr->author, game_hdr->version);
-
 
 	/* allocate save buffer */
 	save_data_length = 1; // current player

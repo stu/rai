@@ -1,4 +1,10 @@
+.idea
 *.rai
+*.o
+*.OBJ
+*.EXE
+*.obj
+*.exe
 c64_c128_plus4/c128_ram.s
 c64_c128_plus4/c128_reu.s
 c64_c128_plus4/c64_ram.s

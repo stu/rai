@@ -21,17 +21,18 @@ solution "interp"
 		configuration "linux"
             buildoptions{"-U_FORTIFY_SOURCE", "-D_FORTIFY_SOURCE=0"}
 			defines { "BUILD_UNIXLIKE" }
-			links { "garglkmain", "garglk", "pthread","gtk-x11-2.0","atk-1.0","gio-2.0","pangoft2-1.0","freetype","gdk-x11-2.0","pangocairo-1.0","gdk_pixbuf-2.0","m","pango-1.0","cairo","gmodule-2.0","png12","gobject-2.0","gthread-2.0","rt","glib-2.0","fontconfig" }
+			--"pthread","gtk-x11-2.0","atk-1.0","gio-2.0","pangoft2-1.0","freetype","gdk-x11-2.0","pangocairo-1.0","gdk_pixbuf-2.0","m","pango-1.0","cairo","gmodule-2.0","png16","gobject-2.0","gthread-2.0","rt","glib-2.0","fontconfig"
+			links { "garglkmain", "garglk","stdc++"  }
 			files { "unix_glkterm.c", "unix_glkterm.h" }
 			excludes { "win32_glk.c", "win32_glk.h", "win32_glkstart.c" }
-			--includedirs { "/home/sgeorge/outside/garglk/garglk" }
-            --libdirs { "/home/sgeorge/outside/garglk/build/linux.release/garglk/" }
+			includedirs { "/usr/local/include/garglk" }
+            		--libdirs { "/usrlocal/lib/garglk/" }
 
 		configuration "windows"
 			--kind "WindowedApp"
 			defines { "BUILD_WIN32", "_WINDOWS" }
 			links { "winglk", "iberty", "kernel32", "z" }
-			
+
 			files { "win32_glk.c", "win32_glkstart.c" }
 			includedirs { "/usr/local/include/winglk" }
 			libdirs { "/usr/local/lib/winglk" }

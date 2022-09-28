@@ -1,7 +1,7 @@
 # unixy makefile.
 
 # This one comes with VICE
-C1541 = /opt/vice/bin/c1541
+C1541 = /usr/local/bin/c1541
 
 CC = cl65
 AS = ca65
@@ -17,17 +17,18 @@ LFLAGS= -t c64 -O
 
 OBJS = main.o c64_reu.o c64_ram.o
 
-all: clean pucrunch/pucrunch r64 sv disk c128 plus4 diskall
+all: clean pucrunch/pucrunch r64 disk c128 diskall
+#plus4
 
 pucrunch/pucrunch:
 	cd pucrunch ; $(MAKE) -f Makefile all
 
 c64_reu.o:
-	co65 --code-label _x_reu $(CC65_HOME)/emd/c64-reu.emd -o c64_reu.s
+	co65 --code-label _x_reu $(CC65_HOME)/target/c64/drv/emd/c64-reu.emd -o c64_reu.s
 	ca65 c64_reu.s
 
 c64_ram.o:
-	co65 --code-label _x_ram $(CC65_HOME)/emd/c64-ram.emd -o c64_ram.s
+	co65 --code-label _x_ram $(CC65_HOME)/target/c64/drv/emd/c64-ram.emd -o c64_ram.s
 	ca65 c64_ram.s
 
 
@@ -44,6 +45,7 @@ sv:
 
 rai64: r64
 	pucrunch/pucrunch -fshort -m6 -f -c64 r64 rai64
+	#cp r64 rai64
 
 disk: rai64
 	$(C1541) -format game,po  d64 $@.d64 > /dev/null
@@ -54,11 +56,11 @@ disk: rai64
 	$(C1541) -attach $@.d64 -write ../games/al.rai > /dev/null || exit $$?;\
 	$(C1541) -attach $@.d64 -write ../games/pod.rai > /dev/null || exit $$?;\
 
-diskall: rai64 plus4 c128
+diskall: rai64 c128 #plus4
 	$(C1541) -format game,po d64 $@.d64 > /dev/null
 	$(C1541) -attach $@.d64 -write rai64 > /dev/null || exit $$?;\
 	$(C1541) -attach $@.d64 -write rai128 > /dev/null || exit $$?;\
-	$(C1541) -attach $@.d64 -write raip4 > /dev/null || exit $$?;\
+	#$(C1541) -attach $@.d64 -write raip4 > /dev/null || exit $$?;
 	$(C1541) -attach $@.d64 -write ../games/dutch.rai > /dev/null || exit $$?;\
 	$(C1541) -attach $@.d64 -write ../games/mystery.rai > /dev/null || exit $$?;\
 	$(C1541) -attach $@.d64 -write ../games/adv1.rai > /dev/null || exit $$?;\

@@ -1,8 +1,8 @@
 #!/bin/bash
-./compiler.rb -x  ./adv1.gs
-./compiler.rb -x  ./al.gs
-./compiler.rb -x  ./dutch.gs
-./compiler.rb -x  ./mystery.gs
-./compiler.rb -x  ./pod.gs
-
+./compiler.rb -z -x ./adv1.gs
+./compiler.rb -z -x ./al.gs
+./compiler.rb -z -x ./dutch.gs
+./compiler.rb -z -x ./mystery.gs
+./compiler.rb -z -x ./pod.gs
+./compiler.rb -z -x ./avalanche.gs
 

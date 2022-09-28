@@ -900,14 +900,23 @@ static uint8_t* get_stringX(int idx)
 	uint8_t * ptr,*x,*xx;
 	uint16_t len;
 	uint16_t z;
+	uint16_t s1, s2, s3;
+
+	s1 = get_pointer(data + game_hdr->offs_string_table + (idx * 2) + 0);
+	s2 = get_pointer(data + game_hdr->offs_string_table + (idx * 2) + 2);
+
 
 	x = get_string(idx);
 	xx = x;
 	len = 0;
 
-	while ((z = get_pointer(x)) != 0)
+	s3 = s2 - s1;
+	while (s3>0)
 	{
+		z = get_pointer(x);
 		x += 2;
+		s3 -= 2;
+
 		if (game_hdr->interp_required_version > 2)
 		{
 			len += strlen(xdata + z);
@@ -919,6 +928,7 @@ static uint8_t* get_stringX(int idx)
 			{
 				z = get_pointer(x);
 				x += 2;
+				s3 -= 2;
 				len += (z >> 12);
 			}
 		}
@@ -930,11 +940,14 @@ static uint8_t* get_stringX(int idx)
 	xx = calloc(1, len + 8);
 	ptr = xx;
 
-	while ((z = get_pointer(x)) != 0)
+	s3 = s2 - s1;
+	while (s3>0)
 	{
 		uint32_t offs;
 
+		z = get_pointer(x);
 		x += 2;
+		s3 -= 2;
 
 		if (game_hdr->interp_required_version > 2)
 		{
@@ -954,6 +967,7 @@ static uint8_t* get_stringX(int idx)
 		{
 			z = get_pointer(x);
 			x += 2;
+			s3 -= 2;
 			memmove(ptr, xdata + (z & 0xFFF), (z >> 12));
 			ptr += (z >> 12);
 		}
@@ -975,7 +989,7 @@ static uint8_t* get_stringX(int idx)
 
 static void print_string(uint16_t idx)
 {
-	uint8_t * ptr,*optr,*x;
+	uint8_t *ptr,*optr,*x;
 	uint8_t z;
 
 
@@ -1082,6 +1096,12 @@ static void print_string(uint16_t idx)
 	}
 
 	glk_put_string((char *)x);
+
+	ptr = strchr(x, 0);
+	if(ptr != x)
+		ptr -= 1;
+	if(*ptr == '.')
+		glk_put_string(" ");
 
 	free(optr);
 }
@@ -1584,6 +1604,7 @@ static uint8_t run_codeblock(uint8_t *ptr)
 		"X_NOTIN",
 		"X_RANDOM",
 		"X_HASNOT",
+		"X_BYTECODE_JUMP",
 	};
 #endif
 
@@ -2018,6 +2039,11 @@ static uint8_t run_codeblock(uint8_t *ptr)
 				ptr++;
 				pause_time(ptr[0]);
 				ptr++;
+				break;
+
+			case X_BYTECODE_GOTO:
+				ptr += 1;
+				ptr = data + get_pointer(ptr);
 				break;
 
 			default:

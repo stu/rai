@@ -401,15 +401,23 @@ static uint8_t* get_stringX(int idx)
 	ptr = x;
 	len = 0;
 
-	while (get_pointer(x) != 0)
+	uint16_t s1, s2, s3;
+
+	s1 = get_pointer(data + game_hdr->offs_string_table + (idx * 2) + 0);
+	s2 = get_pointer(data + game_hdr->offs_string_table + (idx * 2) + 2);
+
+	s3 = s2 - s1;
+	while (s3>0)
 	{
 		z = get_pointer(x);
 		x += 2;
+		s3 -= 2;
 		len += z >> 12;
 		if (len == 15)
 		{
 			z = get_pointer(x);
 			x += 2;
+			s3 -= 2;
 			len += z >> 12;
 		}
 
@@ -420,11 +428,13 @@ static uint8_t* get_stringX(int idx)
 	xx = calloc(1, len+4);
 	ptr = xx;
 
-	while (get_pointer(x) != 0)
+	s3 = s2 - s1;
+	while (s3>0)
 	{
 		z = get_pointer(x);
-
 		x += 2;
+		s3 -= 2;
+
 		offs = z & 0xFFF;
 		len = z >> 12;
 
@@ -435,6 +445,8 @@ static uint8_t* get_stringX(int idx)
 		{
 			z = get_pointer(x);
 			x += 2;
+			s3 -= 2;
+
 			offs = z & 0xFFF;
 			len = z >> 12;
 			memmove(ptr, data + offs, len);
@@ -921,6 +933,11 @@ static uint8_t* dump_codeblock(uint8_t *ptr, int tab_depth, int comment)
 				if (comment == 1) fprintf(stdout, "# ");
 				fprintf(stdout, "pause %i\n", ptr[0]);
 				ptr++;
+				break;
+
+			case X_BYTECODE_GOTO:
+				dump_codeblock(data + get_pointer(1 + ptr), try_depth, comment);
+				return ptr + 3;
 				break;
 
 			default:

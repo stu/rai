@@ -88,6 +88,7 @@ enum eOpcode
 	X_RANDOM = 40,
 	/*X_HASNOT = 41,*/
 	X_NOT = 42,
+	X_BYTECODE_GOTO = 43,
 
 	X_ENDOPCODES = 255
 };
